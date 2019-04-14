@@ -1,0 +1,4 @@
+flask==1.0.2
+psycopg2-binary==2.8.1
+parsl[aws]==0.7.1
+git+https://git@github.com/macintoshpie/paropt
