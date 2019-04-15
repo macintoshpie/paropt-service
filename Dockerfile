@@ -22,6 +22,9 @@ RUN source activate paroptservice_py367 && pip install -r requirements.txt
 COPY ./ ./app
 WORKDIR ./app
 
+# expose server
 EXPOSE 8080
+# expose parsl's HighThroughputExecutor ports
+EXPOSE 54000-54100
 
 CMD source activate paroptservice_py367 && python paropt_service/app.py

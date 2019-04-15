@@ -118,7 +118,6 @@ class ParoptManager():
   
   @classmethod
   def getOrCreateExperiment(cls, experiment_dict):
-    print("Creating experiment: {}".format(experiment_dict))
     experiment_params = [Parameter(**param) for param in experiment_dict.get('parameters')]
     experiment_dict.pop('parameters')
     experiment = Experiment(parameters=experiment_params, **experiment_dict)
@@ -162,6 +161,15 @@ class ParoptManager():
     else:
       parsl_config = local_config
 
-    po = ParslRunner(parsl_config, timeCmd, optimizer, storage, experiment=experiment)
-    po.run()
+    po = ParslRunner(
+      parsl_config=parsl_config,
+      parsl_app=timeCmd,
+      optimizer=optimizer,
+      storage=storage,
+      experiment=experiment,
+      logs_root_dir='/var/log/paropt')
+    po.run(debug=True)
+    # cleanup launched instances
+    po.cleanup()
     finish_queue.put(experiment.id)
+
