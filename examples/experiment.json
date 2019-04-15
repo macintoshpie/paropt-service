@@ -1,0 +1,11 @@
+{
+  "tool_name": "mytool",
+  "parameters": [
+    {
+      "name": "parameterA",
+      "minimum": 0,
+      "maximum": 10
+    }
+  ],
+  "command_template_string": "echo \"HELLO WORLD\"\n sleep ${parameterA}"
+}
