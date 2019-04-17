@@ -11,7 +11,8 @@ import json
 import traceback
 
 from flask import Blueprint, jsonify, request, abort
-from parsl.app.app import python_app
+
+from .utils import login_required
 
 from .paropt_manager import ParoptManager
 
@@ -27,6 +28,7 @@ def toJson(obj):
     return json.dumps(obj, indent=2, sort_keys=True, default=str)
 
 @api.route('/experiments', methods=['POST'])
+@login_required
 def getOrCreateExperiment():
     """Create a new experiment
     Expects json body like below. All attributes are required.
@@ -58,6 +60,7 @@ def getOrCreateExperiment():
         return "Failed to get/create experiment: {}".format(e), 500
 
 @api.route('/experiments/<experiment_id>', methods=['GET'])
+@login_required
 def getExperiment(experiment_id):
     """Get Experiment info"""
     experiment = ParoptManager.getExperiment(experiment_id)
@@ -71,12 +74,14 @@ def getExperiment(experiment_id):
     return toJson(experiment_dict), 200
 
 @api.route('/experiments/<experiment_id>/trials', methods=['GET'])
+@login_required
 def getTrials(experiment_id):
     """Get all recorded trials for experiment"""
     trials = ParoptManager.getTrials(experiment_id)
     return toJson(trials), 200
 
 @api.route('/experiments/<experiment_id>/trials', methods=['POST'])
+@login_required
 def runTrials(experiment_id):
     """Run trials for experiment
     Expects json body like below. See the optimizers in paropt package for initialization parameters
@@ -98,12 +103,14 @@ def runTrials(experiment_id):
     return res, 404
 
 @api.route('/experiments/running', methods=['GET'])
+@login_required
 def getRunningExperiments():
     """Get currently running experiments"""
     running_exps = ParoptManager.getRunningExperiments()
     return toJson(running_exps)
 
 @api.route('/experiments/<experiment_id>/stop', methods=['POST'])
+@login_required
 def stopExperiment(experiment_id):
     """Stop a running experiment"""
     stop_res = ParoptManager.stopExperiment(experiment_id)

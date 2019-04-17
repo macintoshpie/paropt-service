@@ -3,7 +3,7 @@ import atexit
 import os
 import time
 
-from config import DB_HOST, DB_USER, DB_PASSWORD, DB_TABLE, in_production, getAWSConfig
+from config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, in_production, getAWSConfig
 
 import parsl
 
@@ -56,7 +56,7 @@ class ParoptManager():
       DB_USER,
       DB_PASSWORD,
       DB_HOST,
-      DB_TABLE
+      DB_NAME
     )
     cls.session = cls.db_storage.Session()
     cls._started = True
@@ -126,7 +126,7 @@ class ParoptManager():
       DB_USER,
       DB_PASSWORD,
       DB_HOST,
-      DB_TABLE
+      DB_NAME
     )
     return db_storage.getOrCreateExperiment(cls.session, experiment)
   
@@ -153,7 +153,7 @@ class ParoptManager():
       DB_USER,
       DB_PASSWORD,
       DB_HOST,
-      DB_TABLE
+      DB_NAME
     )
 
     if in_production:

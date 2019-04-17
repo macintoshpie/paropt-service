@@ -2,12 +2,18 @@ from flask import (Flask, request, flash, redirect, session, url_for)
 
 from api.api import api
 
-from config import SECRET_KEY, _load_funcx_client
+from config import SECRET_KEY, _load_funcx_client, SERVER_DOMAIN, GLOBUS_CLIENT
 
 from api.paropt_manager import ParoptManager
 
 app = Flask(__name__)
 app.register_blueprint(api, url_prefix="/api/v1")
+
+@app.route('/', methods=['GET'])
+def home():
+    """Display if user is authenticated"""
+    return f'Authenticated: {session.get("is_authenticated")}'
+
 
 # TODO: Consider using @authenticated decorator so don't need to check user.
 @app.route('/login', methods=['GET'])
@@ -29,7 +35,7 @@ def callback():
 
     # Set up our Globus Auth/OAuth2 state
     # redirect_uri = url_for('callback', _external=True)
-    redirect_uri = 'https://funcx.org/callback'
+    redirect_uri = f'https://{SERVER_DOMAIN}/callback'
     client = _load_funcx_client()
     client.oauth2_start_flow(redirect_uri, refresh_tokens=False)
 
@@ -54,7 +60,7 @@ def callback():
             is_authenticated=True
         )
 
-        return redirect('https://funcx.org')
+        return redirect(f'https://{SERVER_DOMAIN}')
 
 
 @app.route('/logout', methods=['GET'])
@@ -85,9 +91,9 @@ def logout():
 
     ga_logout_url = list()
     ga_logout_url.append('https://auth.globus.org/v2/web/logout')
-    ga_logout_url.append('?client=6a47fd0c-6423-4851-80a2-c0947c1d884d')
+    ga_logout_url.append(f'?client={globus_client}')
     ga_logout_url.append('&redirect_uri={}'.format(redirect_uri))
-    ga_logout_url.append('&redirect_name=https://funcx.org')
+    ga_logout_url.append(f'&redirect_name=https://{SERVER_DOMAIN}')
 
     # Redirect the user to the Globus Auth logout page
     return redirect(''.join(ga_logout_url))
@@ -98,4 +104,4 @@ app.config['SESSION_TYPE'] = 'filesystem'
 
 if __name__ == "__main__":
     ParoptManager.start()
-    app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False)
+    app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
