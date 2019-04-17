@@ -19,6 +19,9 @@ if in_production:
 else:
   public_ip = os.getenv('PUBLIC_IP')
 
+_domain = os.getenv('SERVER_DOMAIN')
+SERVER_DOMAIN = _domain if _domain != None else f'{public_ip}:8080'
+
 def getAWSConfig():
   return Config(
     executors=[
@@ -55,7 +58,6 @@ DB_HOST = os.environ.get('DB_HOST')
 DB_USER = os.environ.get('DB_USER')
 DB_NAME = os.environ.get('DB_NAME')
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
-DB_TABLE = 'parslTestC'
 
 _prod = in_production
 
