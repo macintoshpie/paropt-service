@@ -1,38 +1,8 @@
 tldr;
 RESTful service for automating optimization of arbitrary tools.
+## Usage
+Clone this repo, then configure the `start_service.sh` as specified in the script. It expects some environment variables to be configured, see `config/.example.env` for an example.  
+Once configured, you can run it in dev mode with `./start_service.sh --dev`, or in prod (on aws) with `./start_service.sh --prod`.
 
 ## Examples
-### Create new experiment
-request body in json format (data.json in example below):
-```json
-{
-  "tool_name": "mytool",
-  "parameters": [
-    {
-      "name": "parameterA",
-      "minimum": 0,
-      "maximum": 10
-    }
-  ],
-  "command_template_string": "echo \"HELLO WORLD\"\n sleep ${parameterA}"
-}
-```
-```bash
-curl -d "@data.json" -H "Content-Type: application/json" -X POST http://localhost:8080/api/v1/experiments
-```
-
-### Run trials for experiment
-After creating an experiment you can run trials.
-In trial.json:
-```json
-{
-  "optimizer": {
-    "type": "bayesopt",
-    "n_init": 2,
-    "n_iter": 2,
-  }
-}
-```
-```bash
-curl -d "@trial.json" -H "Content-Type: application/json" -X POST http://localhost:8080/api/v1/experiments/1/trials
-```
+See examples in `/examples`.
