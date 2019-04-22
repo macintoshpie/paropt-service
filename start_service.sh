@@ -28,7 +28,7 @@ if [[ "${paropt_run_location}" =~ "prod" ]]; then
 
   # run the container
   sudo docker run -p 8080:8080 -p 54000-54100:54000-54100 \
-    -v ${PAROPT_HOST_PROVIDER_STATE}:/etc/awsproviderstate.json \
+    -v ${PAROPT_HOST_AWS_STATE_FILE}:${PAROPT_AWS_STATE_FILE} \
     -v ${PAROPT_HOST_LOGS}:/var/log/paropt \
     --env-file config/.env.prod \
     -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
