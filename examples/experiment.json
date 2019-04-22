@@ -7,5 +7,11 @@
       "maximum": 10
     }
   ],
+  "compute": {
+    "type": "ec2",
+    "instance_model": "t2.small",
+    "instance_family": "t2",
+    "ami": "ami-073e3f122e47832bf"
+  },
   "command_template_string": "echo \"HELLO WORLD\"\n sleep ${parameterA}"
 }
