@@ -1,0 +1,10 @@
+version: '3.7'
+
+services:
+  web:
+    environment:
+      - PROD=true
+    env_file:
+      - ./config/.env.prod
+    volumes:
+      - ./config/awsproviderstate.json:/etc/awsproviderstate.json
