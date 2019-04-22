@@ -13,11 +13,7 @@ from parsl.executors.ipp import IPyParallelExecutor
 from parsl.executors.ipp_controller import Controller
 
 in_production = True if os.getenv('PROD') != None else False
-if in_production:
-  print("Fetching Public IP from instance metadata...")
-  public_ip = urllib.request.urlopen("http://169.254.169.254/latest/meta-data/public-ipv4").read().decode()
-else:
-  public_ip = os.getenv('PUBLIC_IP')
+public_ip = os.getenv('PUBLIC_IP')
 
 _domain = os.getenv('SERVER_DOMAIN')
 SERVER_DOMAIN = _domain if _domain != None else f'{public_ip}:8080'
