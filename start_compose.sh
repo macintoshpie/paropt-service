@@ -11,6 +11,4 @@ else
   shift
 fi
 
-# catting env file b/c it contains some variables used in docker yaml file
-sudo env $(cat config/.env.${paropt_env} | sed '/^#/d') \
-  docker-compose -f docker-compose.yml -f docker-compose.${paropt_env}.yml up $@
+sudo docker-compose -f docker-compose.yml -f docker-compose.${paropt_env}.yml up $@
