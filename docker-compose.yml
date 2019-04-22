@@ -11,7 +11,7 @@ services:
     command: >
       bash -c "source activate paroptservice_py367 && python paropt_service/app.py"
     volumes:
-      - ${PAROPT_HOST_LOGS}:/var/log/paropt
+      - ${PAROPT_HOST_LOGS:-/var/log/paropt}:/var/log/paropt
     environment:
       - PUBLIC_IP
     depends_on:
