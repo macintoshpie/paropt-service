@@ -11,8 +11,8 @@ import paropt
 from paropt.runner import ParslRunner
 from paropt.storage import LocalFile, RelationalDB
 from paropt.optimizer import BayesianOptimizer, GridSearch
-from paropt.runner.parsl import timeCmd, local_config
-from paropt.storage.entities import Parameter, Experiment
+from paropt.runner.parsl import timeCmd
+from paropt.storage.entities import Parameter, Experiment, EC2Compute, LocalCompute
 
 def getOptimizer(optimizer_config):
   if optimizer_config == None:
@@ -88,7 +88,7 @@ class ParoptManager():
     if optimizer == None:
       return False, "Invalid run configuration provided"
     
-    x = multiprocessing.Process(target=cls._startRunner, args=[experiment, optimizer, cls._finished_experiments], name="Runner-123")
+    x = multiprocessing.Process(target=cls._startRunner, args=[experiment.asdict(), optimizer, cls._finished_experiments], name="Runner-123")
     x.start()
     cls._running_experiments[experiment_id] = x
     return True, "started experiment"
@@ -115,12 +115,21 @@ class ParoptManager():
   def getTrials(cls, experiment_id):
     trials = cls.db_storage.getTrials(cls.session, experiment_id)
     return [trial.asdict() for trial in trials]
+
+  @classmethod
+  def dictToExperiment(cls, experiment_dict):
+    experiment_params = [Parameter(**param) for param in experiment_dict.pop('parameters')]
+    if in_production:
+      compute = EC2Compute(**experiment_dict.pop('compute'))
+    else:
+      compute = LocalCompute(**experiment_dict.pop('compute'))
+    return Experiment(parameters=experiment_params, compute=compute, **experiment_dict)
   
   @classmethod
   def getOrCreateExperiment(cls, experiment_dict):
-    experiment_params = [Parameter(**param) for param in experiment_dict.get('parameters')]
-    experiment_dict.pop('parameters')
-    experiment = Experiment(parameters=experiment_params, **experiment_dict)
+    experiment = cls.dictToExperiment(experiment_dict)
+    print("experiment dict: ", experiment_dict)
+    print('CREATED EXPERIMENT: ', experiment)
     db_storage = RelationalDB(
       'postgresql',
       DB_USER,
@@ -145,9 +154,9 @@ class ParoptManager():
     return {'message': "experiment {} not already running".format(experiment_id)}
 
   @classmethod
-  def _startRunner(cls, experiment, optimizer, finish_queue):
+  def _startRunner(cls, experiment_dict, optimizer, finish_queue):
     paropt.setConsoleLogger()
-
+    experiment = cls.dictToExperiment(experiment_dict)
     storage = RelationalDB(
       'postgresql',
       DB_USER,
@@ -156,19 +165,14 @@ class ParoptManager():
       DB_NAME
     )
 
-    if in_production:
-      parsl_config = getAWSConfig()
-    else:
-      parsl_config = local_config
-
     po = ParslRunner(
-      parsl_config=parsl_config,
       parsl_app=timeCmd,
       optimizer=optimizer,
       storage=storage,
       experiment=experiment,
       logs_root_dir='/var/log/paropt')
     po.run(debug=True)
+
     # cleanup launched instances
     po.cleanup()
     finish_queue.put(experiment.id)

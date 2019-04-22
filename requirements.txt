@@ -3,4 +3,4 @@ globus-sdk
 psycopg2-binary==2.8.1
 pyopenssl
 parsl[aws]>=0.7.2
-git+https://git@github.com/macintoshpie/paropt
+git+https://git@github.com/macintoshpie/paropt.git@feat/compute
