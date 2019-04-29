@@ -3,6 +3,7 @@
   "parameters": [
     {
       "name": "parameterA",
+      "type": "int",
       "minimum": 0,
       "maximum": 10
     }
