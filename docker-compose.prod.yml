@@ -6,3 +6,8 @@ services:
       - ./config/.env.prod
     volumes:
       - ./config/awsproviderstate.json:/etc/awsproviderstate.json
+  worker:
+    env_file:
+      - ./config/.env.prod
+    volumes:
+      - ./config/awsproviderstate.json:/etc/awsproviderstate.json

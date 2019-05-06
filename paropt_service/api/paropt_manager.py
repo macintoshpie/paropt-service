@@ -3,6 +3,13 @@ import atexit
 import os
 import time
 
+from flask import current_app
+
+import redis
+from rq import Queue, Connection
+from rq.registry import StartedJobRegistry
+from rq.job import Job
+
 from config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, in_production, getAWSConfig
 
 import parsl
@@ -15,6 +22,14 @@ from paropt.runner.parsl import timeCmd
 from paropt.storage.entities import Parameter, Experiment, EC2Compute, LocalCompute
 
 def getOptimizer(optimizer_config):
+  """Construct optimizer from a config dict
+  
+  Args:
+    optimizer_config(dict): configuration for optimizer
+  
+  Returns:
+    Optimizer
+  """
   if optimizer_config == None:
     return BayesianOptimizer(
       n_init=2,
@@ -39,18 +54,14 @@ def getOptimizer(optimizer_config):
       return None
 
 class ParoptManager():
+  """Manages paropt tasks and storage records using Redis queue and paropt storage"""
   _started = False
-  _cleanup_proc = None
-  _running_experiments = {}
-  _finished_experiments = multiprocessing.Queue()
   db_storage = None
-  session = None
 
   @classmethod
   def start(cls):
     if cls._started:
       return
-    atexit.register(cls._stop)
     cls.db_storage = RelationalDB(
       'postgresql',
       DB_USER,
@@ -58,66 +69,118 @@ class ParoptManager():
       DB_HOST,
       DB_NAME
     )
-    cls.session = cls.db_storage.Session()
     cls._started = True
-  
-  @classmethod
-  def _stop(cls):
-    # find other children and stop them
-    for child in multiprocessing.active_children():
-      child.terminate()
 
   @classmethod
   def runTrials(cls, experiment_id, run_config):
+    """Put experiment into job queue to be run
+
+    Args:
+      experiment_id(int): id of experiment to run
+      run_config(dict): dict for how to config optimizer
+    
+    Returns:
+      result(dict): result of attempt to add job to queue
+    """
     if not cls._started:
       raise Exception("ParoptManager not started")
-      
-    # clear out the finished queue while we're here
-    cls._clearQueue()
+
+    # check if experiment exists
+    experiment = cls.getExperimentDict(experiment_id)
+    if experiment == None:
+      return {'status': 'failed', 'message': "Experiment not found with id {}".format(id)}
     
     # check if experiment is already running
-    experiment_proc = cls._running_experiments.get(experiment_id, None)
-    if experiment_proc != None and experiment_proc.is_alive():
-      return True, "experiment already running"
-
-    experiment = cls.getExperiment(experiment_id)
-    if experiment == None:
-      return False, "Experiment not found with id {}".format(id)
+    job = cls.getRunningExperiment(experiment_id)
+    if job:
+      return {'status': 'failed', 'message': 'Experiment already running'}
     
     optimizer = getOptimizer(run_config.get('optimizer'))
     if optimizer == None:
-      return False, "Invalid run configuration provided"
+      return {'status': 'failed', 'message': "Invalid run configuration provided"}
     
-    x = multiprocessing.Process(target=cls._startRunner, args=[experiment.asdict(), optimizer, cls._finished_experiments], name="Runner-123")
-    x.start()
-    cls._running_experiments[experiment_id] = x
-    return True, "started experiment"
+    # submit job to redis
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])):
+      q = Queue()
+      job = q.enqueue(
+        f=cls._startRunner,
+        args=(experiment, optimizer),
+        result_ttl=0,
+        job_timeout=-1,
+        meta={'experiment_id': str(experiment_id)})
 
-  @classmethod
-  def _clearQueue(cls):
-    while not cls._finished_experiments.empty():
-      old_experiment_id = str(cls._finished_experiments.get(False))
-      proc = cls._running_experiments.pop(old_experiment_id, None)
-      if proc != None:
-        assert proc.is_alive() == False
+    response_object = {
+      'status': 'submitted',
+      'job': cls.jobToDict(job)
+    }
+    return response_object
 
   @classmethod
   def getRunningExperiments(cls):
-    cls._clearQueue()
-    return list(cls._running_experiments.keys())
+    """Returns experiments currently being run
+
+    Returns:
+      jobs(list): list of jobs that are being run
+    """
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
+      registry = StartedJobRegistry('default', connection=conn)
+      q = Queue(connection=conn)
+      return [Job.fetch(id, connection=conn) for id in registry.get_job_ids()]
   
   @classmethod
-  def isRunning(cls, experiment_id):
-    cls._clearQueue()
-    return None != cls._running_experiments.get(str(experiment_id))
+  def jobToDict(cls, job):
+    """Returns job as dict"""
+    if job == None:
+      return {}
+    else:
+      return {
+        'job_id': job.get_id(),
+        'job_status': job.get_status(),
+        'job_result': job.result,
+        'job_meta': job.meta
+      }
+  
+  @classmethod
+  def getRunningExperiment(cls, experiment_id):
+    """Gets the running job for experiment
+    Args:
+      experiment_id(str): id of experiment
+    Returns:
+      experiment(Job): is None if not currently running
+    """
+    jobs = cls.getRunningExperiments()
+    for job in jobs:
+      if job.get_status() != 'finished' and job.meta.get('experiment_id') == str(experiment_id):
+        return job
+    return None
   
   @classmethod
   def getTrials(cls, experiment_id):
-    trials = cls.db_storage.getTrials(cls.session, experiment_id)
-    return [trial.asdict() for trial in trials]
+    """Gets previous trials for experiment
+    Args:
+      experiment_id(str): id of experiment
+    Returns:
+      trials([]dict): List of trials in dict representation
+    """
+    session = cls.db_storage.Session()
+    try:
+      trials = cls.db_storage.getTrials(session, experiment_id)
+      trials_dicts = [trial.asdict() for trial in trials]
+    except:
+      session.rollback()
+      raise
+    finally:
+      session.close()
+    return trials_dicts
 
   @classmethod
   def dictToExperiment(cls, experiment_dict):
+    """Returns dict as Experiment
+    Args:
+      experiment_dict(dict): dictionary representation of Experiment
+    Returns:
+      experiment(Experiment): constructed Experiment
+    """
     experiment_params = [Parameter(**param) for param in experiment_dict.pop('parameters')]
     if in_production:
       compute = EC2Compute(**experiment_dict.pop('compute'))
@@ -127,34 +190,66 @@ class ParoptManager():
   
   @classmethod
   def getOrCreateExperiment(cls, experiment_dict):
+    """Get or create experiment from dict
+    Args:
+      experiment_dict(dict): dictionary representation of Experiment
+    Returns:
+      experiment(dict): new or fetched Experiment as a dict
+    """
     experiment = cls.dictToExperiment(experiment_dict)
-    print("experiment dict: ", experiment_dict)
-    print('CREATED EXPERIMENT: ', experiment)
-    db_storage = RelationalDB(
-      'postgresql',
-      DB_USER,
-      DB_PASSWORD,
-      DB_HOST,
-      DB_NAME
-    )
-    return db_storage.getOrCreateExperiment(cls.session, experiment)
+    session = cls.db_storage.Session()
+    try:
+      experiment, _, _ = cls.db_storage.getOrCreateExperiment(session, experiment)
+      experiment_dict = experiment.asdict()
+    except:
+      session.rollback()
+      raise
+    finally:
+      session.close()
+    return experiment_dict
   
   @classmethod
-  def getExperiment(cls, experiment_id):
-    return cls.db_storage.getExperiment(cls.session, experiment_id)
+  def getExperimentDict(cls, experiment_id):
+    """Get experiment as a dict
+    Args:
+      experiment_id(str): id of experiment
+    Returns:
+      experiment(Experiment): dict of found experiment; None if not found
+    """
+    session = cls.db_storage.Session()
+    try:
+      experiment = cls.db_storage.getExperiment(session, experiment_id)
+      experiment_dict = experiment.asdict() if experiment != None else None
+    except:
+      session.rollback()
+      raise
+    finally:
+      session.close()
+    return experiment_dict
 
   @classmethod
   def stopExperiment(cls, experiment_id):
-    cls._clearQueue()
-    exp = cls._running_experiments.get(experiment_id, None)
-    if exp != None:
-      exp.terminate()
-      cls._running_experiments.pop(experiment_id)
-      return {'message': "stopped running experiment {}".format(experiment_id)}
-    return {'message': "experiment {} not already running".format(experiment_id)}
+    """Stops running an experiment
+    Args:
+      experiment_id(str): experiment to stop
+    """
+    return {'message': 'this functionality is not implemented yet'}
 
   @classmethod
-  def _startRunner(cls, experiment_dict, optimizer, finish_queue):
+  def _startRunner(cls, experiment_dict, optimizer):
+    """Runs an experiment with paropt. This is the function used for job queueing
+
+    Args:
+      experiment_dict(dict): dict representation of experiment to run.
+        Although it's a dict, the experiment it represents should already exist in the database.
+      optimizer(Optimizer): Optimizer instance to use for running the experiment
+    
+    Returns:
+      result(dict): result of the run
+    
+    Raises:
+      Exception: when the runner fails, it will raise an exception with the message from the result
+    """
     paropt.setConsoleLogger()
     experiment = cls.dictToExperiment(experiment_dict)
     storage = RelationalDB(
@@ -172,8 +267,10 @@ class ParoptManager():
       experiment=experiment,
       logs_root_dir='/var/log/paropt')
     po.run(debug=True)
-
     # cleanup launched instances
     po.cleanup()
-    finish_queue.put(experiment.id)
 
+    if po.run_result['success'] == False:
+      raise Exception(po.run_result['message'])
+
+    return po.run_result

@@ -7,11 +7,19 @@ services:
     container_name: web
     ports:
       - '8080:8080'
+    command: >
+      bash -c "source activate paroptservice_py367 && python paropt_service/app.py --server"
+    depends_on:
+      - redis
+  
+  worker:
+    image: web
+    ports:
       - '54000-54100:54000-54100'
     command: >
-      bash -c "source activate paroptservice_py367 && python paropt_service/app.py"
+      bash -c "source activate paroptservice_py367 && python paropt_service/app.py --worker"
     volumes:
-      - ${PAROPT_HOST_LOGS:-/var/log/paropt}:/var/log/paropt
+      - ${PAROPT_HOST_LOGS:?err}:/var/log/paropt
     depends_on:
       - redis
 
