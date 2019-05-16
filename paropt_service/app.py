@@ -1,10 +1,14 @@
+import argparse
+
 from flask import (Flask, request, flash, redirect, session, url_for)
 
-from api.api import api
+import redis
+from rq import Connection, Worker
 
+from api.api import api
+from api.paropt_manager import ParoptManager
 from config import SECRET_KEY, _load_funcx_client, SERVER_DOMAIN, GLOBUS_CLIENT
 
-from api.paropt_manager import ParoptManager
 
 app = Flask(__name__)
 app.register_blueprint(api, url_prefix="/api/v1")
@@ -101,7 +105,25 @@ def logout():
 
 app.secret_key = SECRET_KEY
 app.config['SESSION_TYPE'] = 'filesystem'
+app.config['REDIS_URL'] = 'redis://redis:6379/0'
+app.config['QUEUES'] = ['default']
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run paropt server and workers')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--server', action='store_true')
+    group.add_argument('--worker', action='store_false')
+    args = parser.parse_args()
+
     ParoptManager.start()
-    app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
+
+    if args.server:
+        app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
+    else:
+        # TODO: could fork x processes for running from queue, each given a range of ports for HTEX
+        redis_url = app.config['REDIS_URL']
+        redis_connection = redis.from_url(redis_url)
+        with Connection(redis_connection):
+            worker = Worker(app.config['QUEUES'])
+            worker.work()
+        

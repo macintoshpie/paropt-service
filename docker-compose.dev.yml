@@ -6,3 +6,6 @@ services:
       - FLASK_DEBUG=1
     env_file:
       - ./config/.env.dev
+  worker:
+    env_file:
+      - ./config/.env.dev

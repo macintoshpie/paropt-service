@@ -11,4 +11,4 @@ else
   shift
 fi
 
-sudo docker-compose -f docker-compose.yml -f docker-compose.${paropt_env}.yml up $@
+sudo -E docker-compose -f docker-compose.yml -f docker-compose.${paropt_env}.yml up $@
