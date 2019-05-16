@@ -23,7 +23,6 @@ import paropt
 from paropt.runner import ParslRunner
 from paropt.storage import LocalFile, RelationalDB
 from paropt.optimizer import BayesianOptimizer, GridSearch
-from paropt.runner.parsl import timeCmd
 
 api = Blueprint("api", __name__)
 
@@ -106,6 +105,22 @@ def getRunningExperiments():
     running_exps = ParoptManager.getRunningExperiments()
     running_exps = [ParoptManager.jobToDict(job) for job in running_exps]
     return jsonify(running_exps)
+
+@api.route('/experiments/failed', methods=['GET'])
+@login_required
+def getFailedExperiments():
+    """Get failed experiments"""
+    failed_exps = ParoptManager.getFailedExperiments()
+    failed_exps = [ParoptManager.jobToDict(job) for job in failed_exps]
+    return jsonify(failed_exps)
+
+@api.route('/experiments/deferred', methods=['GET'])
+@login_required
+def getDeferredExperiments():
+    """Get deferred experiments"""
+    deferred_exps = ParoptManager.getDeferredExperiments()
+    deferred_exps = [ParoptManager.jobToDict(job) for job in deferred_exps]
+    return jsonify(deferred_exps)
 
 @api.route('/experiments/<int:experiment_id>/stop', methods=['POST'])
 @login_required

@@ -7,7 +7,7 @@ from flask import current_app
 
 import redis
 from rq import Queue, Connection
-from rq.registry import StartedJobRegistry
+from rq.registry import StartedJobRegistry, FailedJobRegistry, DeferredJobRegistry
 from rq.job import Job
 
 from config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, in_production, getAWSConfig
@@ -18,7 +18,7 @@ import paropt
 from paropt.runner import ParslRunner
 from paropt.storage import LocalFile, RelationalDB
 from paropt.optimizer import BayesianOptimizer, GridSearch
-from paropt.runner.parsl import timeCmd
+from paropt.runner.parsl import timeCommand
 from paropt.storage.entities import Parameter, Experiment, EC2Compute, LocalCompute
 
 def getOptimizer(optimizer_config):
@@ -107,6 +107,7 @@ class ParoptManager():
         args=(experiment, optimizer),
         result_ttl=0,
         job_timeout=-1,
+        ttl=-1,
         meta={'experiment_id': str(experiment_id)})
 
     response_object = {
@@ -125,6 +126,18 @@ class ParoptManager():
     with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
       registry = StartedJobRegistry('default', connection=conn)
       q = Queue(connection=conn)
+      return [Job.fetch(id, connection=conn) for id in registry.get_job_ids()]
+  
+  @classmethod
+  def getFailedExperiments(cls):
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
+      registry = FailedJobRegistry('default', connection=conn)
+      return [Job.fetch(id, connection=conn) for id in registry.get_job_ids()]
+  
+  @classmethod
+  def getDeferredExperiments(cls):
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
+      registry = DeferredJobRegistry('default', connection=conn)
       return [Job.fetch(id, connection=conn) for id in registry.get_job_ids()]
   
   @classmethod
@@ -153,7 +166,7 @@ class ParoptManager():
       if job.get_status() != 'finished' and job.meta.get('experiment_id') == str(experiment_id):
         return job
     return None
-  
+
   @classmethod
   def getTrials(cls, experiment_id):
     """Gets previous trials for experiment
@@ -261,7 +274,7 @@ class ParoptManager():
     )
 
     po = ParslRunner(
-      parsl_app=timeCmd,
+      parsl_app=timeCommand,
       optimizer=optimizer,
       storage=storage,
       experiment=experiment,
