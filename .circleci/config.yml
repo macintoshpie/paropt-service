@@ -5,8 +5,8 @@ jobs:
     working_directory: ~/paropt-service
     steps:
       - run:
-        command: ls ~/paropt-service
+          command: ls ~/paropt-service
       - run:
-        command: ~/paropt-service/start_compose.sh --dev -d
+          command: ~/paropt-service/start_compose.sh --dev -d
       - run:
-        command: echo "good job!"
+          command: echo "good job!"
