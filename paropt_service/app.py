@@ -97,7 +97,7 @@ def logout():
 
     ga_logout_url = list()
     ga_logout_url.append('https://auth.globus.org/v2/web/logout')
-    ga_logout_url.append(f'?client={globus_client}')
+    ga_logout_url.append(f'?client={GLOBUS_CLIENT}')
     ga_logout_url.append('&redirect_uri={}'.format(redirect_uri))
     ga_logout_url.append(f'&redirect_name=https://{SERVER_DOMAIN}')
 
