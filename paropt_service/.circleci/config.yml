@@ -1,9 +1,8 @@
-version: 2
-jobs:
-  build:
-    machine: true # Use a Linux VM instead of docker environment
-    working_directory: ~/paropt-service
-    steps:
-      - run ls ~/paropt-service
-      - run ~/paropt-service/start_compose.sh --dev -d
-      - run echo "good job!"
+ version: 2
+ jobs:
+   build:
+     docker:
+       - image: circleci/ruby:2.4.1
+     steps:
+       - checkout
+       - run: echo "A first hello"
