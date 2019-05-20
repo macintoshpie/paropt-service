@@ -3,6 +3,12 @@
 # Helper for running docker compose
 #
 
+if [[ "$(uname)" == "Darwin" ]]; then
+  export PAROPT_HOST_LOGS=~/Library/Logs/paropt/
+else
+  export PAROPT_HOST_LOGS=/var/log/paropt/
+fi
+
 if [[ $1 =~ prod$ ]]; then
   paropt_env="prod"
   shift
