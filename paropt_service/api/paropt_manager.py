@@ -150,7 +150,8 @@ class ParoptManager():
         'job_id': job.get_id(),
         'job_status': job.get_status(),
         'job_result': job.result,
-        'job_meta': job.meta
+        'job_meta': job.meta,
+        'job_exc_info': job.exc_info
       }
   
   @classmethod
