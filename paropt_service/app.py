@@ -1,4 +1,6 @@
 import argparse
+from multiprocessing import Process
+import sys
 
 from flask import (Flask, request, flash, redirect, session, url_for)
 
@@ -108,11 +110,17 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['REDIS_URL'] = 'redis://redis:6379/0'
 app.config['QUEUES'] = ['default']
 
+def startWorker(redis_url, queues):
+    redis_connection = redis.from_url(redis_url)
+    with Connection(redis_connection):
+        worker = Worker(queues)
+        worker.work()
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run paropt server and workers')
+    parser = argparse.ArgumentParser(description='Run paropt server or workers.')
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('--server', action='store_true')
-    group.add_argument('--worker', action='store_false')
+    group.add_argument('--server', action='store_true', help='run as server')
+    group.add_argument('--workers', type=int, help='number of workers to start')
     args = parser.parse_args()
 
     ParoptManager.start()
@@ -120,10 +128,14 @@ if __name__ == "__main__":
     if args.server:
         app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
     else:
-        # TODO: could fork x processes for running from queue, each given a range of ports for HTEX
+        if args.workers <= 0:
+            print("Error: --workers must be an integer > 0")
+            sys.exit(1)
+        procs = []
         redis_url = app.config['REDIS_URL']
-        redis_connection = redis.from_url(redis_url)
-        with Connection(redis_connection):
-            worker = Worker(app.config['QUEUES'])
-            worker.work()
-        
+        for i in range(args.workers):
+            procs.append(Process(target=startWorker,
+                                 args=(app.config['REDIS_URL'], app.config['QUEUES'])))
+            procs[i].start()
+        for proc in procs:
+            proc.join()

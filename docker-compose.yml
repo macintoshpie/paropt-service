@@ -17,7 +17,8 @@ services:
     ports:
       - '54000-54100:54000-54100'
     command: >
-      bash -c "source activate paroptservice_py367 && python paropt_service/app.py --worker"
+      bash -c "source activate paroptservice_py367 &&
+               python paropt_service/app.py --workers ${REDIS_WORKERS:-2}"
     volumes:
       - ${PAROPT_HOST_LOGS:?err}:/var/log/paropt
     depends_on:
