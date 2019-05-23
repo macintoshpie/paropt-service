@@ -46,7 +46,10 @@ def getAWSConfig():
   )
 
 GLOBUS_KEY = os.environ.get('globus_key')
-GLOBUS_CLIENT = os.environ.get('globus_client')
+# IMPORTANT: these client id's must NOT be None due to their use in auth checking
+# This is why we set them to empty strings if missing
+GLOBUS_CLIENT = os.environ.get('globus_client', '')
+GLOBUS_CLIENT_NATIVE = os.environ.get('globus_client_native', '')
 
 SECRET_KEY = os.environ.get('secret_key')
 
@@ -73,7 +76,8 @@ def _load_funcx_client():
   """
   Create an AuthClient for the portal
   """
-  if _prod:
+  # TODO: REMOVE THE TRUE
+  if _prod or True:
       app = globus_sdk.ConfidentialAppAuthClient(GLOBUS_CLIENT,
                                                   GLOBUS_KEY)
   else:
