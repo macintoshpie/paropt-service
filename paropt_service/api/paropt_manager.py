@@ -9,6 +9,7 @@ import redis
 from rq import Queue, Connection
 from rq.registry import StartedJobRegistry, FailedJobRegistry, DeferredJobRegistry
 from rq.job import Job
+from rq.exceptions import NoSuchJobError
 
 from config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, in_production, getAWSConfig
 
@@ -85,15 +86,15 @@ class ParoptManager():
     if not cls._started:
       raise Exception("ParoptManager not started")
 
+    # debugging get job (should be requested based on experiment id)
+    job = cls.getExperimentJob(experiment_id)
+    if job != None:
+      return {'status': 'failed', 'message': 'Experiment already enqueued or running'}
+
     # check if experiment exists
     experiment = cls.getExperimentDict(experiment_id)
     if experiment == None:
       return {'status': 'failed', 'message': "Experiment not found with id {}".format(id)}
-    
-    # check if experiment is already running
-    job = cls.getRunningExperiment(experiment_id)
-    if job:
-      return {'status': 'failed', 'message': 'Experiment already running'}
     
     optimizer = getOptimizer(run_config.get('optimizer'))
     if optimizer == None:
@@ -105,7 +106,7 @@ class ParoptManager():
       job = q.enqueue(
         f=cls._startRunner,
         args=(experiment, optimizer),
-        result_ttl=0,
+        result_ttl=3600,
         job_timeout=-1,
         ttl=-1,
         meta={'experiment_id': str(experiment_id)})
@@ -125,7 +126,6 @@ class ParoptManager():
     """
     with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
       registry = StartedJobRegistry('default', connection=conn)
-      q = Queue(connection=conn)
       return [Job.fetch(id, connection=conn) for id in registry.get_job_ids()]
   
   @classmethod
@@ -139,6 +139,46 @@ class ParoptManager():
     with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
       registry = DeferredJobRegistry('default', connection=conn)
       return [Job.fetch(id, connection=conn) for id in registry.get_job_ids()]
+  
+  @classmethod
+  def getQueuedJobs(cls):
+    """Get a list of currently enqueued jobs"""
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])):
+      q = Queue()
+      return q.jobs # Gets a list of enqueued job instances
+  
+  @classmethod
+  def getExperimentJob(cls, experiment_id):
+    """Get job of an experiment - either enqueued or running"""
+
+    # check running jobs
+    running_jobs = cls.getRunningExperiments()
+    for job in running_jobs:
+      current_app.logger.info('Currently running: {}'.format(job))
+      if job.get_status() != 'finished' and job.meta.get('experiment_id') == str(experiment_id):
+        return job
+
+    # check queued jobs
+    queued_jobs = cls.getQueuedJobs()
+    for job in queued_jobs:
+      current_app.logger.info('Enqueued job: {}'.format(job))
+      if job.get_status() != 'finished' and job.meta.get('experiment_id') == str(experiment_id):
+        return job
+    
+    # job not found
+    return None
+  
+  @classmethod
+  def getJob(cls, job_id):
+    with Connection(redis.from_url(current_app.config['REDIS_URL'])) as conn:
+      job = None
+      try:
+        job = Job.fetch(job_id, connection=conn)
+      except NoSuchJobError:
+        pass
+      except:
+        raise
+      return job
   
   @classmethod
   def jobToDict(cls, job):

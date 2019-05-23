@@ -1,5 +1,5 @@
-tldr;
-RESTful service for automating optimization of arbitrary tools.
+### tldr;
+RESTful service for automating optimization of arbitrary tools. See [paropt](https://github.com/macintoshpie/paropt) for the standalone python package for automated optimization, and [paropt-service-sdk](https://github.com/macintoshpie/paropt-service-sdk) for a python wrapper for HTTP requests to this service.
 
 ## Setup
 To run the service, clone this repo then setup your environment variable files `config/.env.prod` and `config/.env.dev`. The file `config/.example.env` shows the required environment variables and what they are used for.
@@ -16,22 +16,27 @@ Usage:
 ```
 
 ## Usage
-See examples in `/examples` directory. Here's a quick overview the endpoints (prefixed with `/api/v1`)
+See examples in `/examples` directory. Here's a quick overview the endpoints (all calls should be prefixed with `/api/v1`)
 * `/experiments`
   * POST: get or create experiment
     * see examples directory for expected body
-* `/experiments/<id>`
+* `/experiments/<experiment id>`
   * GET: get experiment info
-* `/experiments/<id>/trials`
+* `/experiments/<experiment id>/trials`
   * GET: get trials for experiment
   * POST: start running a new trial
     * body indicates optimization config. see examples directory for expected body
-* `/experiments/running`
-  * GET: get currently running experiments
-* `/experiments/failed`
-  * GET: get runs that failed
-* `/experiments/deferred`
-  * GET: get deferred experiments
+* `/experients/<experiment id>/job`
+  * GET: get "current" (queued or running) job for experiment. Returns `404` if not queued or running and `status` contains `missing`
+* `/jobs/<job id>`
+  * GET: get job info. Returns `404` if not found and `status` is `missing`
+* `/jobs/running`
+  * GET: get currently running jobs
+* `/jobs/failed`
+  * GET: get failed jobs (including stack trace)
+* `/jobs/queued`
+  * GET: get queued jobs
 
 ## Authentication
-Note that currently we are using flask sessions for auth, so if running in `prod`, you'll first have to go through the auth flow by visiting the `/login` endpoint. You must login with a uchicago account to use the service. Once authenthenticated, the session is maintained through your `session` cookie, so if you want to make any requests outside of the browser, youll need to copy that cookie into your requests.
+You can authenticate by hitting the `/login` endpoint, which will redirect you to the main site after successfully logging in. You'll be provided with a session cookie for future auth.  
+When using the `paropt-service-sdk`, you'll be given an access token which will be used for each request.

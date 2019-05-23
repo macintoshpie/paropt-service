@@ -5,7 +5,9 @@ import sys
 from flask import (Flask, request, flash, redirect, session, url_for)
 
 import redis
-from rq import Connection, Worker
+from rq import Connection, Worker, Queue
+from rq.registry import StartedJobRegistry
+from rq.job import Job
 
 from api.api import api
 from api.paropt_manager import ParoptManager
@@ -111,6 +113,7 @@ app.config['REDIS_URL'] = 'redis://redis:6379/0'
 app.config['QUEUES'] = ['default']
 
 def startWorker(redis_url, queues):
+    ParoptManager.start()
     redis_connection = redis.from_url(redis_url)
     with Connection(redis_connection):
         worker = Worker(queues)
@@ -123,19 +126,26 @@ if __name__ == "__main__":
     group.add_argument('--workers', type=int, help='number of workers to start')
     args = parser.parse_args()
 
-    ParoptManager.start()
-
     if args.server:
+        ParoptManager.start()
         app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
     else:
         if args.workers <= 0:
             print("Error: --workers must be an integer > 0")
             sys.exit(1)
-        procs = []
+        
         redis_url = app.config['REDIS_URL']
+        # clear the started job - if shut down while running a job, the job will remain in StartedJobsRegistry
+        # when it's restarted, which is a problem because it's not actually running anymore
+        with Connection(redis.from_url(redis_url)) as conn:
+            registry = StartedJobRegistry('default', connection=conn)
+            for job_id in registry.get_job_ids():
+                registry.remove(Job.fetch(job_id, connection=conn))
+
+        procs = []
         for i in range(args.workers):
             procs.append(Process(target=startWorker,
-                                 args=(app.config['REDIS_URL'], app.config['QUEUES'])))
+                                 args=(redis_url, app.config['QUEUES'])))
             procs[i].start()
         for proc in procs:
             proc.join()
