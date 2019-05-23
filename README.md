@@ -20,18 +20,22 @@ See examples in `/examples` directory. Here's a quick overview the endpoints (pr
 * `/experiments`
   * POST: get or create experiment
     * see examples directory for expected body
-* `/experiments/<id>`
+* `/experiments/<experiment id>`
   * GET: get experiment info
-* `/experiments/<id>/trials`
+* `/experiments/<experiment id>/trials`
   * GET: get trials for experiment
   * POST: start running a new trial
     * body indicates optimization config. see examples directory for expected body
-* `/experiments/running`
-  * GET: get currently running experiments
-* `/experiments/failed`
-  * GET: get runs that failed
-* `/experiments/deferred`
-  * GET: get deferred experiments
+* `/experients/<experiment id>/job`
+  * GET: get "current" (queued or running) job for experiment. Returns `404` if not queued or running and `status` contains `missing`
+* `/jobs/<job id>`
+  * GET: get job info. Returns `404` if not found and `status` is `missing`
+* `/jobs/running`
+  * GET: get currently running jobs
+* `/jobs/failed`
+  * GET: get failed jobs (including stack trace)
+* `/jobs/queued`
+  * GET: get queued jobs
 
 ## Authentication
 Note that currently we are using flask sessions for auth, so if running in `prod`, you'll first have to go through the auth flow by visiting the `/login` endpoint. You must login with a uchicago account to use the service. Once authenthenticated, the session is maintained through your `session` cookie, so if you want to make any requests outside of the browser, youll need to copy that cookie into your requests.
