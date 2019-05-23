@@ -98,7 +98,7 @@ def runTrials(experiment_id):
         return jsonify(result), 202
     return jsonify(result), 400
 
-@api.route('/experiments/running', methods=['GET'])
+@api.route('/jobs/running', methods=['GET'])
 @login_required
 def getRunningExperiments():
     """Get currently running experiments"""
@@ -106,7 +106,7 @@ def getRunningExperiments():
     running_exps = [ParoptManager.jobToDict(job) for job in running_exps]
     return jsonify(running_exps)
 
-@api.route('/experiments/failed', methods=['GET'])
+@api.route('/jobs/failed', methods=['GET'])
 @login_required
 def getFailedExperiments():
     """Get failed experiments"""
@@ -114,13 +114,13 @@ def getFailedExperiments():
     failed_exps = [ParoptManager.jobToDict(job) for job in failed_exps]
     return jsonify(failed_exps)
 
-@api.route('/experiments/deferred', methods=['GET'])
+@api.route('/jobs/queued', methods=['GET'])
 @login_required
-def getDeferredExperiments():
-    """Get deferred experiments"""
-    deferred_exps = ParoptManager.getDeferredExperiments()
-    deferred_exps = [ParoptManager.jobToDict(job) for job in deferred_exps]
-    return jsonify(deferred_exps)
+def getQueuedExperiments():
+    """Get queued jobs"""
+    queued_exps = ParoptManager.getQueuedJobs()
+    queued_exps = [ParoptManager.jobToDict(job) for job in queued_exps]
+    return jsonify(queued_exps)
 
 @api.route('/experiments/<int:experiment_id>/stop', methods=['POST'])
 @login_required
@@ -128,3 +128,23 @@ def stopExperiment(experiment_id):
     """Stop a running experiment"""
     stop_res = ParoptManager.stopExperiment(experiment_id)
     return jsonify(stop_res)
+
+@api.route('/experiments/<int:experiment_id>/job', methods=['GET'])
+@login_required
+def getExperimentJob(experiment_id):
+    job = ParoptManager.getExperimentJob(experiment_id)
+    job_dict = ParoptManager.jobToDict(job)
+    if job == None:
+        return jsonify({'status': 'missing', 'job': job_dict}), 404
+    else:
+        return jsonify({'status': 'success', 'job': job_dict}), 200
+
+@api.route('/jobs/<string:job_id>', methods=['GET'])
+@login_required
+def getJob(job_id):
+    job = ParoptManager.getJob(job_id)
+    job_dict = ParoptManager.jobToDict(job)
+    if job == None:
+        return jsonify({'status': 'missing', 'job': job_dict}), 404
+    else:
+        return jsonify({'status': 'success', 'job': job_dict}), 200
