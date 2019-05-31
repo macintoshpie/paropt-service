@@ -12,6 +12,8 @@ import traceback
 
 from flask import Blueprint, jsonify, request, abort, current_app
 
+import psycopg2
+
 import redis
 from rq import Queue, Connection
 
@@ -53,6 +55,10 @@ def getOrCreateExperiment():
     try:
         experiment_dict = ParoptManager.getOrCreateExperiment(request_data)
         return jsonify(experiment_dict), 200
+    except psycopg2.OperationalError as e:
+        print("DB Error: {}".format(e))
+        print(traceback.format_exc())
+        return "Failed to get/create experiment due to database error. Please retry your request", 500
     except Exception as e:
         print("Error: {}".format(e))
         print(traceback.format_exc())
