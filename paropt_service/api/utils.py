@@ -11,7 +11,7 @@ def login_required(f):
     # if not in_production:
     #   return f(*args, **kwargs)
     # if user already has auth'd session, continue call
-    if session.get('is_authenticated') == True:
+    if not in_production or session.get('is_authenticated') == True:
       return f(*args, **kwargs)
     # if use set Authorization header, check if token is valid
     elif 'Authorization' in request.headers:
