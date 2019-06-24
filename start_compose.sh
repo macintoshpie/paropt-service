@@ -3,10 +3,16 @@
 # Helper for running docker compose
 #
 
+
 if [[ "$(uname)" == "Darwin" ]]; then
   export PAROPT_HOST_LOGS=~/Library/Logs/paropt/
 else
   export PAROPT_HOST_LOGS=/var/log/paropt/
+fi
+
+if [[ $1 =~ build$ ]]; then
+  sudo -E docker-compose build --no-cache
+  exit $?
 fi
 
 if [[ $1 =~ prod$ ]]; then

@@ -5,7 +5,7 @@ LABEL maintainer="Ted Summer <ted.summer2@gmail.com>"
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update
-RUN apt-get install -y git-core curl
+RUN apt-get install -y gcc git-core curl
 
 # get miniconda
 RUN curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o ~/miniconda.sh
