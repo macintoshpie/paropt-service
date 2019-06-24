@@ -49,7 +49,7 @@ def getOptimizer(optimizer_config):
   elif optimizer_type == 'grid':
     num_configs_per_param = optimizer_config.get('num_configs_per_param')
     try:
-      num_configs_per_param = int(num_configs_per_param)
+      num_configs_per_param = list(num_configs_per_param)
       return GridSearch(num_configs_per_param=num_configs_per_param)
     except:
       return None
@@ -97,8 +97,9 @@ class ParoptManager():
       return {'status': 'failed', 'message': "Experiment not found with id {}".format(id)}
     
     optimizer = getOptimizer(run_config.get('optimizer'))
+    tmp = run_config.get('optimizer')
     if optimizer == None:
-      return {'status': 'failed', 'message': "Invalid run configuration provided"}
+      return {'status': 'failed', 'message': f'Invalid run configuration provided {tmp}'}
     
     # submit job to redis
     with Connection(redis.from_url(current_app.config['REDIS_URL'])):

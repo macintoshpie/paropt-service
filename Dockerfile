@@ -4,9 +4,12 @@ LABEL maintainer="Ted Summer <ted.summer2@gmail.com>"
 
 SHELL ["/bin/bash", "-c"]
 
+RUN apt-get clean
 RUN apt-get update
 RUN apt-get install -y git-core curl
-
+# RUN gcc --version
+# RUN apt-get install -y g++ gcc
+# RUN apt-get install -y build-essential
 # get miniconda
 RUN curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o ~/miniconda.sh
 RUN bash ~/miniconda.sh -b -p /root/miniconda
@@ -17,7 +20,7 @@ ENV PATH="/root/miniconda/bin:$PATH"
 RUN conda create --name paroptservice_py367 python=3.6.7 --yes
 COPY ./requirements.txt ./app/
 WORKDIR ./app
-RUN source activate paroptservice_py367 && pip install -r requirements.txt
+RUN source activate paroptservice_py367 && pip uninstall paropt && pip install --no-cache-dir -r requirements.txt
 
 COPY ./ ./app
 WORKDIR ./app

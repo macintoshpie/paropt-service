@@ -2,8 +2,11 @@ flask==1.0.2
 globus-sdk
 psycopg2-binary==2.8.1
 pyopenssl
-parsl[aws]>=0.7.2
-git+https://git@github.com/macintoshpie/paropt
+parsl[aws]==0.7.2
+# comment
+# git+https://git@github.com/macintoshpie/paropt@macintoshpie-patch-1
+git+https://git@github.com/chaofengwu/paropt@modify_try_in_parslrunner_run
+# git+https://git@github.com/chaofengwu/paropt
 redis>=3.2.1
 # rq>=1.0
 git+https://git@github.com/macintoshpie/rq@patch-3
