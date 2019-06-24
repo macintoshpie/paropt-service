@@ -3,7 +3,7 @@ version: '3.7'
 services:
   web:
     build: .
-    image: web
+    image: paropt-service
     container_name: web
     ports:
       - '8080:8080'
@@ -13,7 +13,7 @@ services:
       - redis
   
   worker:
-    image: web
+    image: paropt-service
     ports:
       - '54000-54100:54000-54100'
     command: >

@@ -125,6 +125,10 @@ def setupAWS():
     from paropt.optimizer import BayesianOptimizer, GridSearch
     from paropt.runner.parsl import timeCommand
     from paropt.storage.entities import Parameter, PARAMETER_TYPE_INT, Experiment, LocalCompute, EC2Compute
+    
+    container_state_file_dir = os.getenv("CONTAINER_STATE_FILE_DIR")
+    if not container_state_file_dir:
+        raise Exception("Missing required env var CONTAINER_STATE_FILE_DIR which is used for copying awsproviderstate.json to host")
 
     paropt.setConsoleLogger()
 
@@ -142,9 +146,9 @@ def setupAWS():
         command_template_string=command_template_string,
         compute=EC2Compute(
             type='ec2',
-            instance_model="t2.micro",
-            instance_family="t2",
-            ami="ami-00c79db59589996b9" # amazon Linux ami
+            instance_model="c5.large", # using c5 b/c previously had trouble with t2 spot instances
+            instance_family="c5",
+            ami="ami-078018a195b149801" # parsl base ami - preinstalled apt packages
         )
     )
 
@@ -177,6 +181,10 @@ def setupAWS():
     # print result
     print(po.run_result)
 
+    # move the awsproviderstate file into expected directory
+    from shutil import copyfile
+    copyfile("awsproviderstate.json", f'{container_state_file_dir}/awsproviderstate.json') 
+
 def startWorker(redis_url, queues):
     ParoptManager.start()
     redis_connection = redis.from_url(redis_url)
@@ -189,13 +197,13 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--server', action='store_true', help='run as server')
     group.add_argument('--workers', type=int, help='number of workers to start')
-    group.add_argument('--setup-aws', action='store_true', help='launch a single small job to setup awsproviderstate.json; intended to be used with `docker run ...` before first run of production server')
+    group.add_argument('--setupaws', action='store_true', help='launch a single small job to setup awsproviderstate.json; intended to be used with `docker run ...` before first run of production server')
     args = parser.parse_args()
 
     if args.server:
         ParoptManager.start()
         app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
-    elif args.setup_aws:
+    elif args.setupaws:
         # run func to configure aws provider state
         setupAWS()
     else:
