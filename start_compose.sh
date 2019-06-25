@@ -3,7 +3,7 @@
 # Helper for running docker compose
 #
 
-if [[ $1 =~ setup-aws$ ]]; then
+if [[ $1 =~ setupaws$ ]]; then
   service_root="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
   statefile="${service_root}/config/awsproviderstate.json"
   

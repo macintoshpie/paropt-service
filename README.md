@@ -10,16 +10,16 @@ See the example env file for more info.
 Once you've properly setup the .env file, you can run the `start_compose.sh` script:
 ```
 Usage:
-./start_compose.sh [--dev | --prod | --build | --setup-aws]
+./start_compose.sh [--dev | --prod | --build | --setupaws]
   --dev: run dev deployment, using .env.dev file and dockerfile.dev.yaml - auth endpoint protection is disabled
   --prod: run prod deployment, using .env.prod file and dockerifile.prod.yaml - auth endpoint protection is enabled
   --build: rebuild docker image wihtout caching (ie from scratch) - useful when there's an update to requirements
-  --setup-aws: should be run before starting the production server - runs simple experiment to generate VPC state file, awsproviderstate.json, for parsl
+  --setupaws: should be run before starting the production server - runs simple experiment to generate VPC state file, awsproviderstate.json, for parsl
 ```
 
 If running in production (on AWS), you'll need to have the service launch a test instance which will create a VPC used by parsl *before* starting the server:
 ```
-./start_compose.sh --setup-aws
+./start_compose.sh --setupaws
 ```
 Note that if you have already attempted to start the server you might get some errors. When troubleshooting make sure theres nothing at `./config/awsprovider.json`, and rebuild the image without caching by running `./start_compose --build`. It's also possible that you have misconfigured the `.env.prod` file, make sure your Account, Key, ec2 key name, and instance role arn are properly configured.  
 Once it successfully runs, you should find the file parsl created under `./config/awsproviderstate.json`, and you can now start the server.
