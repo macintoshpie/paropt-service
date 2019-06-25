@@ -5,6 +5,8 @@ pyopenssl
 parsl[aws]==0.8.0
 git+https://git@github.com/macintoshpie/paropt
 redis>=3.2.1
+# Using patched rq - a worker queue is broken in current release
+# Update when next version is released (patch has been merged on github)
 # rq>=1.0
 git+https://git@github.com/macintoshpie/rq@patch-3
 
