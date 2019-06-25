@@ -112,6 +112,79 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['REDIS_URL'] = 'redis://redis:6379/0'
 app.config['QUEUES'] = ['default']
 
+def setupAWS():
+    # launch a small parsl job on AWS to initialize parsl's AWS VPC stuff
+    # If run successfully, it will create the awsproviderstate.json file on host in paropt-service/config/
+    # Needs to be run each time the AWS credentials are changed for the server
+    # Intended to be used with a `docker run ...` command before running production server
+    import os
+
+    import paropt
+    from paropt.runner import ParslRunner
+    from paropt.storage import RelationalDB
+    from paropt.optimizer import BayesianOptimizer, GridSearch
+    from paropt.runner.parsl import timeCommand
+    from paropt.storage.entities import Parameter, PARAMETER_TYPE_INT, Experiment, LocalCompute, EC2Compute
+    
+    container_state_file_dir = os.getenv("CONTAINER_STATE_FILE_DIR")
+    if not container_state_file_dir:
+        raise Exception("Missing required env var CONTAINER_STATE_FILE_DIR which is used for copying awsproviderstate.json to host")
+
+    paropt.setConsoleLogger()
+
+    command_template_string = """
+    #! /bin/bash
+
+    sleep ${myParam}
+    """
+
+    experiment_inst = Experiment(
+        tool_name='tmptool',
+        parameters=[
+            Parameter(name="myParam", type=PARAMETER_TYPE_INT, minimum=0, maximum=10),
+        ],
+        command_template_string=command_template_string,
+        compute=EC2Compute(
+            type='ec2',
+            instance_model="c5.large", # using c5 b/c previously had trouble with t2 spot instances
+            instance_family="c5",
+            ami="ami-078018a195b149801" # parsl base ami - preinstalled apt packages
+        )
+    )
+
+    # use an ephemeral database
+    storage = RelationalDB(
+      'sqlite',
+      '',
+      '',
+      '',
+      'tmpSqliteDB',
+    )
+
+    # run simple bayes opt
+    bayesian_optimizer = BayesianOptimizer(
+        n_init=1,
+        n_iter=1,
+    )
+
+    po = ParslRunner(
+        parsl_app=timeCommand,
+        optimizer=bayesian_optimizer,
+        storage=storage,
+        experiment=experiment_inst,
+        logs_root_dir='/var/log/paropt'
+    )
+
+    po.run(debug=True)
+    po.cleanup()
+
+    # print result
+    print(po.run_result)
+
+    # move the awsproviderstate file into expected directory
+    from shutil import copyfile
+    copyfile("awsproviderstate.json", f'{container_state_file_dir}/awsproviderstate.json') 
+
 def startWorker(redis_url, queues):
     ParoptManager.start()
     redis_connection = redis.from_url(redis_url)
@@ -124,18 +197,22 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--server', action='store_true', help='run as server')
     group.add_argument('--workers', type=int, help='number of workers to start')
+    group.add_argument('--setupaws', action='store_true', help='launch a single small job to setup awsproviderstate.json; intended to be used with `docker run ...` before first run of production server')
     args = parser.parse_args()
 
     if args.server:
         ParoptManager.start()
         app.run(debug=True, host="0.0.0.0", port=8080, use_reloader=False, ssl_context='adhoc')
+    elif args.setupaws:
+        # run func to configure aws provider state
+        setupAWS()
     else:
         if args.workers <= 0:
             print("Error: --workers must be an integer > 0")
             sys.exit(1)
         
         redis_url = app.config['REDIS_URL']
-        # clear the started job - if shut down while running a job, the job will remain in StartedJobsRegistry
+        # clear previously started started jobs - if shut down while running a job, the job will remain in StartedJobsRegistry
         # when it's restarted, which is a problem because it's not actually running anymore
         with Connection(redis.from_url(redis_url)) as conn:
             registry = StartedJobRegistry('default', connection=conn)
